@@ -90,6 +90,8 @@ private:
     unsigned char sp;
     unsigned char display[DISPLAY_WIDTH * DISPLAY_HEIGHT];
     unsigned char keypad[16];
+    unsigned char delayTimer;
+    unsigned char soundTimer;
 
     bool drawFlag;
 
@@ -120,7 +122,7 @@ void Chip8::loadProgram(const std::string& fileName)
         {
             std::cerr << "ROM image is too big: " << buffer.size() << " (max "
                 << MEMORY_SIZE - PROGRAM_MEMORY_OFFSET << ")" << std::endl;
-        }
+        } 
     }
     else
     {
@@ -151,7 +153,7 @@ void Chip8::emulateCycle()
 
 void Chip8::processOpcode(unsigned short opcode)
 {
-    // what about getting each hex separately?
+    // what about getting each hex separately? (NIBBLE - 4 bits)
     // first = opcode & 0xF000
     // second = opcode & 0x0F00
     // third = opcode & 0x00F0
@@ -311,57 +313,123 @@ void Chip8::processOpcode(unsigned short opcode)
         break;
     case 0xD000: // 0xDXYN: draw a sprite at position (VX, VY) with N bytes of sprite data starting at the address I; 
                  // set VF to 01 if any set pixels are changed to unset, and 00 otherwise
-        unsigned short x = V[(opcode & 0x0F00) >> 8];
-        unsigned short y = V[(opcode & 0x00F0) >> 4];
-        unsigned short height = opcode & 0x000F;
-        unsigned short line;
-
-        V[0xF] = 0x00;
-        for (int yline = 0; yline < height; ++yline)
         {
-            line = memory[I + yline];
-            for (int xline = 0; xline < 8; ++xline)
-            {
-                if (line & (0x80 >> xline)) // 0x80 -> 0b1000 0000
-                {
-                    if (display[x + xline + (y + yline) * DISPLAY_WIDTH] == 1)
-                    {
-                        V[0xF] = 0x01;
-                    }
+            unsigned short x = V[(opcode & 0x0F00) >> 8];
+            unsigned short y = V[(opcode & 0x00F0) >> 4];
+            unsigned short height = opcode & 0x000F;
+            unsigned short line;
 
-                    display[x + xline + (y + yline) * DISPLAY_WIDTH] ^= 1;
+            V[0xF] = 0x00;
+            for (int yline = 0; yline < height; ++yline)
+            {
+                line = memory[I + yline];
+                for (int xline = 0; xline < 8; ++xline)
+                {
+                    if (line & (0x80 >> xline)) // 0x80 -> 0b1000 0000
+                    {
+                        if (display[x + xline + (y + yline) * DISPLAY_WIDTH] == 1)
+                        {
+                            V[0xF] = 0x01;
+                        }
+
+                        display[x + xline + (y + yline) * DISPLAY_WIDTH] ^= 1;
+                    }
                 }
             }
-        }
 
-        drawFlag = true;
-        pc += 2;
+            drawFlag = true;
+            pc += 2;
+        }
         break;
     case 0xE000:
         switch (opcode & 0x00FF)
         {
-            case 0x009E: // 0xEX9E: skip the following instruction if the key corresponding
-                         // to the hex value currently stored in VX is pressed
-                if (keypad[V[(opcode & 0x0F00) >> 8]])
+        case 0x009E: // 0xEX9E: skip the following instruction if the key corresponding
+                        // to the hex value currently stored in VX is pressed
+            if (keypad[V[(opcode & 0x0F00) >> 8]])
+            {
+                pc += 4;
+            }
+            else
+            {
+                pc += 2;
+            }
+            break;
+        case 0x00A1: // 0xEXA1: skip the following instruction if the key corresponding
+                        // to the hex value currently stored in VX is not pressed
+            if (!keypad[V[(opcode & 0x0F00) >> 8]])
+            {
+                pc += 4;
+            }
+            else
+            {
+                pc += 2;
+            }
+            break;
+        }
+        break;
+    case 0xF000:
+        switch (opcode & 0x00FF)
+        {
+        case 0x0007: // 0xFX07: store the current value of the delay timer in VX
+            V[(opcode & 0x0F00) >> 8] = delayTimer;
+            pc += 2;
+            break;
+        case 0x000A: // 0xFX0A: wait for a keypress and store the result in VX
+            for (int i = 0; i < 16; ++i)
+            {
+                if (keypad[i])
                 {
-                    pc += 4;
+                    V[(opcode & 0x0F00) >> 8] = i;
+                    pc += 2; // move program counter only if key is pressed
                 }
-                else
-                {
-                    pc += 2;
-                }
-                break;
-            case 0x00A1: // 0xEXA1: skip the following instruction if the key corresponding
-                         // to the hex value currently stored in VX is not pressed
-                if (!keypad[V[(opcode & 0x0F00) >> 8]])
-                {
-                    pc += 4;
-                }
-                else
-                {
-                    pc += 2;
-                }
-                break;
+            }
+            break;
+        case 0x0015: // 0xFX15: set the delay timer to the value of VX
+            delayTimer = V[(opcode & 0x0F00) >> 8];
+            pc += 2;
+            break;
+        case 0x0018: // 0xFX18: set the sound timer to the value of VX
+            soundTimer = V[(opcode & 0x0F00) >> 8];
+            pc += 2;
+            break;
+        case 0x001E: // 0xFX1E: add the value stored in VX to I
+            I += V[(opcode & 0x0F00) >> 8];
+            pc += 2;
+            break;
+        case 0x0029: // 0xFX29: set I to the memory address of the sprite data corresponding
+                     // to the hexadecimal digit stored in VX
+        {
+            const unsigned short FONT_WIDTH = 5;
+            I = V[(opcode & 0x0F00) >> 8] * FONT_WIDTH;
+            pc += 2;
+            break;
+        }
+        case 0x0033: // 0xFX33: store the binary-coded decimal equivalent of the value
+                     // stored in VX at addresses I, I + 1, and I + 2
+            memory[I] = V[(opcode & 0x0F00) >> 8] / 100;
+            memory[I + 1] = (V[(opcode & 0x0F00) >> 8] % 100) / 10;
+            memory[I + 2] = (V[(opcode & 0x0F00) >> 8] % 100) % 10;
+            pc += 2;
+            break;
+        case 0x0055: // 0xFX55: store the values of registers V0 to VX inclusive in memory starting at address I;
+                     // I is set to I + X + 1 after operation
+            for (int i = 0; i <= ((opcode & 0x0F00) >> 8); ++i)
+            {
+                memory[I + i] = V[i];
+            }
+            I += ((opcode & 0x0F00) >> 8) + 1;
+            pc += 2;
+            break;
+        case 0x0065: // 0xFX65: fill registers V0 to VX inclusive with the values stored in memory starting at address I
+                     // I is set to I + X + 1 after operation
+            for (int i = 0; i <= ((opcode & 0x0F00) >> 8); ++i)
+            {
+                V[i] = memory[I + i];
+            }
+            I += ((opcode & 0x0F00) >> 8) + 1;
+            pc += 2;
+            break;
         }
         break;
     }

@@ -1,19 +1,27 @@
-/*#include <iostream>
+#define _SCL_SECURE_NO_WARNINGS
+#include <iostream>
+#include <string>
+#include <vector>
+#include <fstream>
+#include <algorithm>
+#include <random>
 #include <SFML/Graphics.hpp>
 
-const int DISPLAY_WIDTH = 64;
-const int DISPLAY_HEIGHT = 32;
+const unsigned DISPLAY_WIDTH = 64;
+const unsigned DISPLAY_HEIGHT = 32;
+const unsigned MEMORY_SIZE = 4096;
+const unsigned short PROGRAM_MEMORY_OFFSET = 0x200;
 
 const float TILE_SIZE = 10.0f;
 
-char display[DISPLAY_WIDTH * DISPLAY_HEIGHT]{};
+//char display[DISPLAY_WIDTH * DISPLAY_HEIGHT]{};
 
-void setPixel(int x, int y)
+/*void setPixel(int x, int y)
 {
     display[x + y * DISPLAY_WIDTH] = 1;
-}
+}*/
 
-void draw(sf::RenderWindow& window)
+void draw(sf::RenderWindow& window, unsigned char* display)
 {
     for (int i = 0; i < DISPLAY_WIDTH; ++i)
     {
@@ -30,45 +38,6 @@ void draw(sf::RenderWindow& window)
     }
 }
 
-int main()
-{
-    sf::RenderWindow window(sf::VideoMode(DISPLAY_WIDTH * TILE_SIZE, DISPLAY_HEIGHT * TILE_SIZE), "Chip8");
-
-    setPixel(DISPLAY_WIDTH - 1, DISPLAY_HEIGHT - 1);
-
-    while (window.isOpen())
-    {
-        sf::Event event;
-        while (window.pollEvent(event))
-        {
-            if (event.type == sf::Event::Closed)
-                window.close();
-        }
-
-        window.clear();
-        draw(window);
-        //window.draw(shape);
-        window.display();
-    }
-
-    return 0;
-}*/
-#define _SCL_SECURE_NO_WARNINGS
-#include <iostream>
-#include <string>
-#include <vector>
-#include <fstream>
-#include <algorithm>
-#include <random>
-#include <SFML/Graphics.hpp>
-
-
-
-const unsigned DISPLAY_WIDTH = 64;
-const unsigned DISPLAY_HEIGHT = 32;
-const unsigned MEMORY_SIZE = 4096;
-const unsigned short PROGRAM_MEMORY_OFFSET = 0x200;
-
 class Chip8
 {
 public:
@@ -76,6 +45,9 @@ public:
     void loadProgram(const std::string& fileName);
     void initialize();
     void emulateCycle();
+    bool draw();
+    unsigned char* getDisplay();
+    void setKeyState(unsigned short keyCode, sf::Event::EventType eventType);
 
 private:
     void processOpcode(unsigned short opcode);
@@ -140,15 +112,28 @@ void Chip8::initialize()
     std::fill(std::begin(V), std::end(V), 0);
     std::fill(std::begin(stack), std::end(stack), 0);
     std::fill(std::begin(display), std::end(display), 0);
+    std::fill(std::begin(keypad), std::end(keypad), 0);
+
+    delayTimer = 0;
+    soundTimer = 0;
 }
 
 void Chip8::emulateCycle()
 {
     // fetch opcode
-    unsigned short opcode = memory[pc] << 8 || memory[pc + 1];
+    unsigned short opcode = memory[pc] << 8 | memory[pc + 1];
     // process opcode
     processOpcode(opcode);
     // decrement timers
+    if (delayTimer > 0)
+        --delayTimer;
+
+    if (soundTimer > 0)
+    {
+        if (soundTimer == 1)
+            std::cout << "BEEP" << std::endl; // playSound!
+        --soundTimer;
+    }
 }
 
 void Chip8::processOpcode(unsigned short opcode)
@@ -345,7 +330,7 @@ void Chip8::processOpcode(unsigned short opcode)
         switch (opcode & 0x00FF)
         {
         case 0x009E: // 0xEX9E: skip the following instruction if the key corresponding
-                        // to the hex value currently stored in VX is pressed
+                     // to the hex value currently stored in VX is pressed
             if (keypad[V[(opcode & 0x0F00) >> 8]])
             {
                 pc += 4;
@@ -435,13 +420,42 @@ void Chip8::processOpcode(unsigned short opcode)
     }
 }
 
+bool Chip8::draw()
+{
+    if (drawFlag)
+    {
+        drawFlag != drawFlag;
+        return true;
+    }
+    return false;
+}
+
+unsigned char* Chip8::getDisplay()
+{
+    return display;
+}
+
+void Chip8::setKeyState(unsigned short keyCode, sf::Event::EventType eventType)
+{
+    if (eventType == sf::Event::KeyPressed)
+    {
+        keypad[keyCode] = 1;
+    }
+    else if (eventType == sf::Event::KeyReleased)
+    {
+        keypad[keyCode] = 0;
+    }
+}
+
 int main()
 {
     Chip8 chip;
-    chip.loadProgram("mathMaze.ch8");
     chip.initialize();
+    //chip.loadProgram("mathMaze.ch8");
+    //chip.loadProgram("invaders.c8");
+    chip.loadProgram("tetris.c8");
 
-    sf::RenderWindow window(sf::VideoMode(200, 200), "SFML works!");
+    sf::RenderWindow window(sf::VideoMode(DISPLAY_WIDTH * TILE_SIZE, DISPLAY_HEIGHT * TILE_SIZE), "Chip8");
     sf::CircleShape shape(100.f);
     shape.setFillColor(sf::Color::Green);
 
@@ -450,18 +464,75 @@ int main()
         sf::Event event;
         while (window.pollEvent(event))
         {
-            if (event.type == sf::Event::KeyPressed)
+            if (event.type == sf::Event::KeyPressed || event.type == sf::Event::KeyReleased)
             {
-                if (event.key.code == sf::Keyboard::Escape)
+                switch (event.key.code)
                 {
+                case sf::Keyboard::Escape:
                     window.close();
+                    break;
+                case sf::Keyboard::Num1:
+                    chip.setKeyState(0x1, event.type);
+                    break;
+                case sf::Keyboard::Num2:
+                    chip.setKeyState(0x2, event.type);
+                    break;
+                case sf::Keyboard::Num3:
+                    chip.setKeyState(0x3, event.type);
+                    break;
+                case sf::Keyboard::Num4:
+                    chip.setKeyState(0xC, event.type);
+                    break;
+                case sf::Keyboard::Q:
+                    chip.setKeyState(0x4, event.type);
+                    break;
+                case sf::Keyboard::W:
+                    chip.setKeyState(0x5, event.type);
+                    break;
+                case sf::Keyboard::E:
+                    chip.setKeyState(0x6, event.type);
+                    break;
+                case sf::Keyboard::R:
+                    chip.setKeyState(0xD, event.type);
+                    break;
+                case sf::Keyboard::A:
+                    chip.setKeyState(0x7, event.type);
+                    break;
+                case sf::Keyboard::S:
+                    chip.setKeyState(0x8, event.type);
+                    break;
+                case sf::Keyboard::D:
+                    chip.setKeyState(0x9, event.type);
+                    break;
+                case sf::Keyboard::F:
+                    chip.setKeyState(0xE, event.type);
+                    break;
+                case sf::Keyboard::Z:
+                    chip.setKeyState(0xA, event.type);
+                    break;
+                case sf::Keyboard::X:
+                    chip.setKeyState(0x0, event.type);
+                    break;
+                case sf::Keyboard::C:
+                    chip.setKeyState(0xB, event.type);
+                    break;
+                case sf::Keyboard::V:
+                    chip.setKeyState(0xF, event.type);
+                    break;
                 }
             }
         }
 
-        window.clear();
-        window.draw(shape);
-        window.display();
+        chip.emulateCycle();
+
+        if (chip.draw())
+        {
+            window.clear();
+            draw(window, chip.getDisplay());
+            
+            //window.draw(shape);
+            window.display();
+        }
     }
 
     return 0;

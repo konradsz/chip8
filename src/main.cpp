@@ -18,7 +18,7 @@ const float TILE_SIZE = 10.0f;
 
 /*void setPixel(int x, int y)
 {
-    display[x + y * DISPLAY_WIDTH] = 1;
+display[x + y * DISPLAY_WIDTH] = 1;
 }*/
 
 void draw(sf::RenderWindow& window, unsigned char* display)
@@ -44,7 +44,7 @@ public:
     Chip8();
     void loadProgram(const std::string& fileName);
     void initialize();
-    void emulateCycle();
+    void emulateCycle(int numberOfOpcodes);
     bool draw();
     unsigned char* getDisplay();
     void setKeyState(unsigned short keyCode, sf::Event::EventType eventType);
@@ -94,7 +94,7 @@ void Chip8::loadProgram(const std::string& fileName)
         {
             std::cerr << "ROM image is too big: " << buffer.size() << " (max "
                 << MEMORY_SIZE - PROGRAM_MEMORY_OFFSET << ")" << std::endl;
-        } 
+        }
     }
     else
     {
@@ -118,12 +118,16 @@ void Chip8::initialize()
     soundTimer = 0;
 }
 
-void Chip8::emulateCycle()
+void Chip8::emulateCycle(int numberOfOpcodes)
 {
-    // fetch opcode
-    unsigned short opcode = memory[pc] << 8 | memory[pc + 1];
-    // process opcode
-    processOpcode(opcode);
+    for (int i = 0; i < numberOfOpcodes; ++i)
+    {
+        // fetch opcode
+        unsigned short opcode = memory[pc] << 8 | memory[pc + 1];
+        // process opcode
+        processOpcode(opcode);
+    }
+
     // decrement timers
     if (delayTimer > 0)
         --delayTimer;
@@ -298,34 +302,34 @@ void Chip8::processOpcode(unsigned short opcode)
         break;
     case 0xD000: // 0xDXYN: draw a sprite at position (VX, VY) with N bytes of sprite data starting at the address I; 
                  // set VF to 01 if any set pixels are changed to unset, and 00 otherwise
+    {
+        unsigned short x = V[(opcode & 0x0F00) >> 8];
+        unsigned short y = V[(opcode & 0x00F0) >> 4];
+        unsigned short height = opcode & 0x000F;
+        unsigned short line;
+
+        V[0xF] = 0x00;
+        for (int yline = 0; yline < height; ++yline)
         {
-            unsigned short x = V[(opcode & 0x0F00) >> 8];
-            unsigned short y = V[(opcode & 0x00F0) >> 4];
-            unsigned short height = opcode & 0x000F;
-            unsigned short line;
-
-            V[0xF] = 0x00;
-            for (int yline = 0; yline < height; ++yline)
+            line = memory[I + yline];
+            for (int xline = 0; xline < 8; ++xline)
             {
-                line = memory[I + yline];
-                for (int xline = 0; xline < 8; ++xline)
+                if (line & (0x80 >> xline)) // 0x80 -> 0b1000 0000
                 {
-                    if (line & (0x80 >> xline)) // 0x80 -> 0b1000 0000
+                    if (display[x + xline + (y + yline) * DISPLAY_WIDTH] == 1)
                     {
-                        if (display[x + xline + (y + yline) * DISPLAY_WIDTH] == 1)
-                        {
-                            V[0xF] = 0x01;
-                        }
-
-                        display[x + xline + (y + yline) * DISPLAY_WIDTH] ^= 1;
+                        V[0xF] = 0x01;
                     }
+
+                    display[x + xline + (y + yline) * DISPLAY_WIDTH] ^= 1;
                 }
             }
-
-            drawFlag = true;
-            pc += 2;
         }
-        break;
+
+        drawFlag = true;
+        pc += 2;
+    }
+    break;
     case 0xE000:
         switch (opcode & 0x00FF)
         {
@@ -341,7 +345,7 @@ void Chip8::processOpcode(unsigned short opcode)
             }
             break;
         case 0x00A1: // 0xEXA1: skip the following instruction if the key corresponding
-                        // to the hex value currently stored in VX is not pressed
+                     // to the hex value currently stored in VX is not pressed
             if (!keypad[V[(opcode & 0x0F00) >> 8]])
             {
                 pc += 4;
@@ -453,11 +457,15 @@ int main()
     chip.initialize();
     //chip.loadProgram("mathMaze.ch8");
     //chip.loadProgram("invaders.c8");
-    chip.loadProgram("tetris.c8");
+    //chip.loadProgram("tetris.c8");
+    chip.loadProgram("../roms/R-ROULETTE");
 
     sf::RenderWindow window(sf::VideoMode(DISPLAY_WIDTH * TILE_SIZE, DISPLAY_HEIGHT * TILE_SIZE), "Chip8");
     sf::CircleShape shape(100.f);
     shape.setFillColor(sf::Color::Green);
+
+    sf::Clock clock;
+    sf::Time lag;
 
     while (window.isOpen())
     {
@@ -523,13 +531,26 @@ int main()
             }
         }
 
-        chip.emulateCycle();
+        sf::Time elapsed = clock.getElapsedTime();
+        sf::Time time = elapsed + lag;
+
+        const int NUMBER_OF_OPCODES_PER_SECOND = 600;
+        const float TIMER_FREQUENCY = 60.0f; // 60 Hz
+        const int NUMBER_OF_OPCODES_PER_FRAME = NUMBER_OF_OPCODES_PER_SECOND / TIMER_FREQUENCY;
+        const sf::Time tickInterval = sf::microseconds(static_cast<sf::Int64>(1000000.0f / TIMER_FREQUENCY));
+
+        if (time > tickInterval)
+        {
+            chip.emulateCycle(NUMBER_OF_OPCODES_PER_FRAME);
+            lag = time - tickInterval;
+            clock.restart();
+        }
 
         if (chip.draw())
         {
             window.clear();
             draw(window, chip.getDisplay());
-            
+
             //window.draw(shape);
             window.display();
         }

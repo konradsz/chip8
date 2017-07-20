@@ -4,11 +4,18 @@
 #include <fstream>
 #include <algorithm>
 #include <iostream>
+#include <map>
+
+#include <SFML/Graphics.hpp>
+
+const float TILE_SIZE = 10.0f;
 
 Chip8::Chip8() :
+    window{ sf::VideoMode(DISPLAY_WIDTH * TILE_SIZE, DISPLAY_HEIGHT * TILE_SIZE), "Chip8" },
     engine{ std::random_device()() },
     distribution{ 0, 0xFF }
 {
+    reset();
 }
 
 void Chip8::loadProgram(const std::string& fileName)
@@ -36,7 +43,7 @@ void Chip8::loadProgram(const std::string& fileName)
     }
 }
 
-void Chip8::initialize()
+void Chip8::reset()
 {
     pc = PROGRAM_MEMORY_OFFSET;
     sp = 0;
@@ -50,21 +57,56 @@ void Chip8::initialize()
 
     delayTimer = 0;
     soundTimer = 0;
+    redraw = false;
 }
 
-void Chip8::emulateCycle(int numberOfOpcodes)
+void Chip8::run()
 {
-    for (int i = 0; i < numberOfOpcodes; ++i)
-    {
-        // fetch opcode
-        unsigned short opcode = memory[pc] << 8 | memory[pc + 1];
-        // process opcode
-        processOpcode(opcode);
-    }
+    sf::Clock clock;
+    sf::Time lag;
 
-    // decrement timers
+    while (window.isOpen())
+    {
+        handleInput();
+
+        sf::Time elapsed = clock.getElapsedTime();
+        sf::Time time = elapsed + lag;
+
+        const int NUMBER_OF_CYCLES_PER_SECOND = 600;
+        const float TIMER_FREQUENCY = 60.0f; // 60 Hz
+        const int NUMBER_OF_CYCLES_PER_FRAME = NUMBER_OF_CYCLES_PER_SECOND / TIMER_FREQUENCY;
+        const sf::Time tickInterval = sf::microseconds(static_cast<sf::Int64>(1000000.0f / TIMER_FREQUENCY));
+
+        if (time > tickInterval)
+        {
+            for (unsigned int i = 0; i < NUMBER_OF_CYCLES_PER_FRAME; ++i)
+            {
+                emulateCycle();
+            }
+            decrementTimers();
+
+            lag = time - tickInterval;
+            clock.restart();
+        }
+
+        draw();
+    }
+}
+
+void Chip8::emulateCycle()
+{
+    // fetch opcode
+    unsigned short opcode = memory[pc] << 8 | memory[pc + 1];
+    // process opcode
+    processOpcode(opcode);
+}
+
+void Chip8::decrementTimers()
+{
     if (delayTimer > 0)
+    {
         --delayTimer;
+    }
 
     if (soundTimer > 0)
     {
@@ -88,7 +130,7 @@ void Chip8::processOpcode(unsigned short opcode)
         {
         case 0x00E0: // 0x00E0: clear the screen
             std::fill(std::begin(display), std::end(display), 0);
-            drawFlag = true;
+            redraw = true;
             pc += 2;
             break;
         case 0x00EE: // 0x00EE: return from a subroutine
@@ -260,7 +302,7 @@ void Chip8::processOpcode(unsigned short opcode)
             }
         }
 
-        drawFlag = true;
+        redraw = true;
         pc += 2;
     }
     break;
@@ -358,29 +400,86 @@ void Chip8::processOpcode(unsigned short opcode)
     }
 }
 
-bool Chip8::draw()
+void Chip8::draw()
 {
-    if (drawFlag)
+    if (redraw)
     {
-        drawFlag = false;
-        return true;
+        redraw = false;
+        window.clear();
+
+        for (int i = 0; i < DISPLAY_WIDTH; ++i)
+        {
+            for (int j = 0; j < DISPLAY_HEIGHT; ++j)
+            {
+                if (display[i + j * DISPLAY_WIDTH] != 0)
+                {
+                    sf::RectangleShape shape({ TILE_SIZE, TILE_SIZE });
+                    shape.setPosition({ i * TILE_SIZE, j * TILE_SIZE });
+                    shape.setFillColor({ 255, 255, 255 });
+                    window.draw(shape);
+                }
+            }
+        }
+
+        window.display();
     }
-    return false;
 }
 
-unsigned char* Chip8::getDisplay()
+void Chip8::handleInput()
 {
-    return display;
-}
+    static std::map<sf::Keyboard::Key, int> keyCodeMap =
+    {
+        { sf::Keyboard::X,    0x0 },
+        { sf::Keyboard::Num1, 0x1 },
+        { sf::Keyboard::Num2, 0x2 },
+        { sf::Keyboard::Num3, 0x3 },
+        { sf::Keyboard::Q,    0x4 },
+        { sf::Keyboard::W,    0x5 },
+        { sf::Keyboard::E,    0x6 },
+        { sf::Keyboard::A,    0x7 },
+        { sf::Keyboard::S,    0x8 },
+        { sf::Keyboard::D,    0x9 },
+        { sf::Keyboard::Z,    0xA },
+        { sf::Keyboard::C,    0xB },
+        { sf::Keyboard::Num4, 0xC },
+        { sf::Keyboard::R,    0xD },
+        { sf::Keyboard::F,    0xE },
+        { sf::Keyboard::V,    0xF }
+    };
 
-void Chip8::setKeyState(unsigned short keyCode, sf::Event::EventType eventType)
-{
-    if (eventType == sf::Event::KeyPressed)
+    auto isPressed = [](sf::Event::EventType type) { return (type == sf::Event::KeyPressed) ? 1 : 0; };
+
+    sf::Event event;
+    while (window.pollEvent(event))
     {
-        keypad[keyCode] = 1;
-    }
-    else if (eventType == sf::Event::KeyReleased)
-    {
-        keypad[keyCode] = 0;
+        if (event.type == sf::Event::KeyPressed || event.type == sf::Event::KeyReleased)
+        {
+            switch (event.key.code)
+            {
+            case sf::Keyboard::Escape:
+                window.close();
+                break;
+            case sf::Keyboard::Num1:
+            case sf::Keyboard::Num2:
+            case sf::Keyboard::Num3:
+            case sf::Keyboard::Num4:
+            case sf::Keyboard::Q:
+            case sf::Keyboard::W:
+            case sf::Keyboard::E:
+            case sf::Keyboard::R:
+            case sf::Keyboard::A:
+            case sf::Keyboard::S:
+            case sf::Keyboard::D:
+            case sf::Keyboard::F:
+            case sf::Keyboard::Z:
+            case sf::Keyboard::X:
+            case sf::Keyboard::C:
+            case sf::Keyboard::V:
+                keypad[keyCodeMap[event.key.code]] = isPressed(event.type);
+                break;
+            default:
+                break;
+            }
+        }
     }
 }

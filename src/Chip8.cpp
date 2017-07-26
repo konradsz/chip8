@@ -129,207 +129,94 @@ void Chip8::processOpcode(unsigned short opcode)
         switch (opcode & 0x00FF)
         {
         case 0x00E0: // 0x00E0: clear the screen
-            std::fill(std::begin(display), std::end(display), 0);
-            redraw = true;
-            pc += 2;
+            process_00E0(opcode);
             break;
         case 0x00EE: // 0x00EE: return from a subroutine
-            --sp;
-            pc = stack[sp];
-            pc += 2;
+            process_00EE(opcode);
             break;
         }
         break;
     case 0x1000: // 0x1NNN: jump to address NNN
-        pc = opcode & 0x0FFF;
+        process_1NNN(opcode);
         break;
     case 0x2000: // 0x2NNN: execute subrouting starting at address NNN
-        stack[sp] = pc;
-        ++sp;
-        pc = opcode & 0x0FFF;
+        process_2NNN(opcode);
         break;
     case 0x3000: // 0x3XNN: skip the following instruction if VX == NN
-        if (V[(opcode & 0x0F00) >> 8] == (opcode & 0x00FF))
-        {
-            pc += 4;
-        }
-        else
-        {
-            pc += 2;
-        }
+        process_3XNN(opcode);
         break;
     case 0x4000: // 0x4XNN: skip the following instruction if VX != NN
-        if (V[(opcode & 0x0F00) >> 8] != (opcode & 0x00FF))
-        {
-            pc += 4;
-        }
-        else
-        {
-            pc += 2;
-        }
+        process_4XNN(opcode);
         break;
     case 0x5000: // 0x5XY0: skip the following instruction if VX == VY
-        if (V[(opcode & 0x0F00) >> 8] == V[(opcode & 0x00F0) >> 4])
-        {
-            pc += 4;
-        }
-        else
-        {
-            pc += 2;
-        }
+        process_5XY0(opcode);
         break;
     case 0x6000: // 0x6XNN: store NN in VX
-        V[(opcode & 0x0F00) >> 8] = opcode & 0x00FF;
-        pc += 2;
+        process_6XNN(opcode);
         break;
     case 0x7000: // 0x7XNN: add NN to VX
-        V[(opcode & 0x0F00) >> 8] += opcode & 0x00FF;
-        pc += 2;
+        process_7XNN(opcode);
         break;
     case 0x8000:
         switch (opcode & 0x000F)
         {
         case 0x0000: // 0x8XY0: store VY in VX
-            V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x00F0) >> 4];
-            pc += 2;
+            process_8XY0(opcode);
             break;
         case 0x0001: // 0x8XY1: set VX to VX | VY
-            V[(opcode & 0x0F00) >> 8] |= V[(opcode & 0x00F0) >> 4];
-            pc += 2;
+            process_8XY1(opcode);
             break;
         case 0x0002: // 0x8XY2: set VX to VX & VY
-            V[(opcode & 0x0F00) >> 8] &= V[(opcode & 0x00F0) >> 4];
-            pc += 2;
+            process_8XY2(opcode);
             break;
         case 0x0003: // 0x8XY3: set VX to VX ^ VY
-            V[(opcode & 0x0F00) >> 8] ^= V[(opcode & 0x00F0) >> 4];
-            pc += 2;
+            process_8XY3(opcode);
             break;
         case 0x0004: // 0x8XY4: add VY to VX; set VF to 01 if a carry occurs, 00 otherwise
-            if (V[(opcode & 0x0F00) >> 8] > 0xFF - V[(opcode & 0x00F0) >> 4])
-            {
-                V[0xF] = 0x01;
-            }
-            else
-            {
-                V[0xF] = 0x00;
-            }
-            V[(opcode & 0x0F00) >> 8] += V[(opcode & 0x00F0) >> 4];
-            pc += 2;
+            process_8XY4(opcode);
             break;
         case 0x0005: // 0x8XY5: substruct VY from VX; set VF to 00 if a borrow occurs, 01 otherwise
-            if (V[(opcode & 0x0F00) >> 8] < V[(opcode & 0x00F0) >> 4])
-            {
-                V[0xF] = 0x00;
-            }
-            else
-            {
-                V[0xF] = 0x01;
-            }
-            V[(opcode & 0x0F00) >> 8] -= V[(opcode & 0x00F0) >> 4];
-            pc += 2;
+            process_8XY5(opcode);
             break;
         case 0x0006: // 0x8XY6: store VY shifted right one bit in VX;
                      // set VF to the least significant bit prior to the shift
-            V[0xF] = V[(opcode & 0x0F00) >> 8] & 0x1;
-            V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x00F0) >> 4] >> 1;
-            pc += 2;
+            process_8XY6(opcode);
             break;
         case 0x0007: // 0x8XY7: set VX to VY - VX; set VF to 00 if a borrow occurs, 01 otherwise
-            if (V[(opcode & 0x0F00) >> 8] > V[(opcode & 0x00F0) >> 4])
-            {
-                V[0xF] = 0x00;
-            }
-            else
-            {
-                V[0xF] = 0x01;
-            }
-            V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x00F0) >> 4] - V[(opcode & 0x0F00) >> 8];
-            pc += 2;
+            process_8XY7(opcode);
             break;
         case 0x000E: // 0x8XYE: store VY shifted left one bit in VX;
                      // set VF to the most significant bit prior to the shift
-            V[0xF] = V[(opcode & 0x0F00) >> 8] >> 7;
-            V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x00F0) >> 4] << 1;
-            pc += 2;
+            process_8XYE(opcode);
             break;
         }
         break;
     case 0x9000: // 0x9XY0: skip the following instruction if VX != VY
-        if (V[(opcode & 0x0F00) >> 8] != V[(opcode & 0x00F0) >> 4])
-        {
-            pc += 4;
-        }
-        else
-        {
-            pc += 2;
-        }
+        process_9XY0(opcode);
         break;
     case 0xA000: // 0xANNN: store NNN in I
-        I = opcode & 0x0FFF;
-        pc += 2;
+        process_ANNN(opcode);
         break;
     case 0xB000: // 0xBNNN: jump to address NNN + V0
-        pc = (opcode & 0x0FFF) + V[0x0];
+        process_BNNN(opcode);
         break;
     case 0xC000: // 0xCXNN: set VX to a random number with a mask NN
-        V[(opcode & 0x0F00) >> 8] = distribution(engine) & (opcode & 0x00FF);
-        pc += 2;
+        process_CXNN(opcode);
         break;
     case 0xD000: // 0xDXYN: draw a sprite at position (VX, VY) with N bytes of sprite data starting at the address I; 
                  // set VF to 01 if any set pixels are changed to unset, and 00 otherwise
-    {
-        unsigned short x = V[(opcode & 0x0F00) >> 8];
-        unsigned short y = V[(opcode & 0x00F0) >> 4];
-        unsigned short height = opcode & 0x000F;
-        unsigned short line;
-
-        V[0xF] = 0x00;
-        for (int yline = 0; yline < height; ++yline)
-        {
-            line = memory[I + yline];
-            for (int xline = 0; xline < 8; ++xline)
-            {
-                if (line & (0x80 >> xline)) // 0x80 -> 0b1000 0000
-                {
-                    if (display[x + xline + (y + yline) * DISPLAY_WIDTH] == 1)
-                    {
-                        V[0xF] = 0x01;
-                    }
-
-                    display[x + xline + (y + yline) * DISPLAY_WIDTH] ^= 1;
-                }
-            }
-        }
-
-        redraw = true;
-        pc += 2;
-    }
-    break;
+        process_DXYN(opcode);
+        break;
     case 0xE000:
         switch (opcode & 0x00FF)
         {
         case 0x009E: // 0xEX9E: skip the following instruction if the key corresponding
                      // to the hex value currently stored in VX is pressed
-            if (keypad[V[(opcode & 0x0F00) >> 8]])
-            {
-                pc += 4;
-            }
-            else
-            {
-                pc += 2;
-            }
+            process_EX9E(opcode);
             break;
         case 0x00A1: // 0xEXA1: skip the following instruction if the key corresponding
                      // to the hex value currently stored in VX is not pressed
-            if (!keypad[V[(opcode & 0x0F00) >> 8]])
-            {
-                pc += 4;
-            }
-            else
-            {
-                pc += 2;
-            }
+            process_EXA1(opcode);
             break;
         }
         break;
@@ -337,63 +224,35 @@ void Chip8::processOpcode(unsigned short opcode)
         switch (opcode & 0x00FF)
         {
         case 0x0007: // 0xFX07: store the current value of the delay timer in VX
-            V[(opcode & 0x0F00) >> 8] = delayTimer;
-            pc += 2;
+            process_FX07(opcode);
             break;
         case 0x000A: // 0xFX0A: wait for a keypress and store the result in VX
-            for (int i = 0; i < 16; ++i)
-            {
-                if (keypad[i])
-                {
-                    V[(opcode & 0x0F00) >> 8] = i;
-                    pc += 2; // move program counter only if key is pressed
-                }
-            }
+            process_FX0A(opcode);
             break;
         case 0x0015: // 0xFX15: set the delay timer to the value of VX
-            delayTimer = V[(opcode & 0x0F00) >> 8];
-            pc += 2;
+            process_FX15(opcode);
             break;
         case 0x0018: // 0xFX18: set the sound timer to the value of VX
-            soundTimer = V[(opcode & 0x0F00) >> 8];
-            pc += 2;
+            process_FX18(opcode);
             break;
         case 0x001E: // 0xFX1E: add the value stored in VX to I
-            I += V[(opcode & 0x0F00) >> 8];
-            pc += 2;
+            process_FX1E(opcode);
             break;
         case 0x0029: // 0xFX29: set I to the memory address of the sprite data corresponding
                      // to the hexadecimal digit stored in VX
-        {
-            const unsigned short FONT_WIDTH = 5;
-            I = V[(opcode & 0x0F00) >> 8] * FONT_WIDTH;
-            pc += 2;
+            process_FX29(opcode);
             break;
-        }
         case 0x0033: // 0xFX33: store the binary-coded decimal equivalent of the value
                      // stored in VX at addresses I, I + 1, and I + 2
-            memory[I] = V[(opcode & 0x0F00) >> 8] / 100;
-            memory[I + 1] = (V[(opcode & 0x0F00) >> 8] % 100) / 10;
-            memory[I + 2] = (V[(opcode & 0x0F00) >> 8] % 100) % 10;
-            pc += 2;
+            process_FX33(opcode);
             break;
         case 0x0055: // 0xFX55: store the values of registers V0 to VX inclusive in memory starting at address I;
                      // I is set to I + X + 1 after operation
-            for (int i = 0; i <= ((opcode & 0x0F00) >> 8); ++i)
-            {
-                memory[I + i] = V[i];
-            }
-            I += ((opcode & 0x0F00) >> 8) + 1;
-            pc += 2;
+            process_FX55(opcode);
             break;
         case 0x0065: // 0xFX65: fill registers V0 to VX inclusive with the values stored in memory starting at address I
                      // I is set to I + X + 1 after operation
-            for (int i = 0; i <= ((opcode & 0x0F00) >> 8); ++i)
-            {
-                V[i] = memory[I + i];
-            }
-            I += ((opcode & 0x0F00) >> 8) + 1;
-            pc += 2;
+            process_FX65(opcode);
             break;
         }
         break;
@@ -469,4 +328,281 @@ void Chip8::handleInput()
             }
         }
     }
+}
+
+// OPCODES
+void Chip8::process_00E0(unsigned short opcode)
+{
+    std::fill(std::begin(display), std::end(display), 0);
+    redraw = true;
+    pc += 2;
+}
+
+void Chip8::process_00EE(unsigned short opcode)
+{
+    --sp;
+    pc = stack[sp];
+    pc += 2;
+}
+
+void Chip8::process_1NNN(unsigned short opcode)
+{
+    pc = opcode & 0x0FFF;
+}
+void Chip8::process_2NNN(unsigned short opcode)
+{
+    stack[sp] = pc;
+    ++sp;
+    pc = opcode & 0x0FFF;
+}
+void Chip8::process_3XNN(unsigned short opcode)
+{
+    if (V[(opcode & 0x0F00) >> 8] == (opcode & 0x00FF))
+    {
+        pc += 4;
+    }
+    else
+    {
+        pc += 2;
+    }
+}
+void Chip8::process_4XNN(unsigned short opcode)
+{
+    if (V[(opcode & 0x0F00) >> 8] != (opcode & 0x00FF))
+    {
+        pc += 4;
+    }
+    else
+    {
+        pc += 2;
+    }
+}
+void Chip8::process_5XY0(unsigned short opcode)
+{
+    if (V[(opcode & 0x0F00) >> 8] == V[(opcode & 0x00F0) >> 4])
+    {
+        pc += 4;
+    }
+    else
+    {
+        pc += 2;
+    }
+}
+void Chip8::process_6XNN(unsigned short opcode)
+{
+    V[(opcode & 0x0F00) >> 8] = opcode & 0x00FF;
+    pc += 2;
+}
+void Chip8::process_7XNN(unsigned short opcode)
+{
+    V[(opcode & 0x0F00) >> 8] += opcode & 0x00FF;
+    pc += 2;
+}
+void Chip8::process_8XY0(unsigned short opcode)
+{
+    V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x00F0) >> 4];
+    pc += 2;
+}
+void Chip8::process_8XY1(unsigned short opcode)
+{
+    V[(opcode & 0x0F00) >> 8] |= V[(opcode & 0x00F0) >> 4];
+    pc += 2;
+}
+void Chip8::process_8XY2(unsigned short opcode)
+{
+    V[(opcode & 0x0F00) >> 8] &= V[(opcode & 0x00F0) >> 4];
+    pc += 2;
+}
+void Chip8::process_8XY3(unsigned short opcode)
+{
+    V[(opcode & 0x0F00) >> 8] ^= V[(opcode & 0x00F0) >> 4];
+    pc += 2;
+}
+void Chip8::process_8XY4(unsigned short opcode)
+{
+    if (V[(opcode & 0x0F00) >> 8] > 0xFF - V[(opcode & 0x00F0) >> 4])
+    {
+        V[0xF] = 0x01;
+    }
+    else
+    {
+        V[0xF] = 0x00;
+    }
+    V[(opcode & 0x0F00) >> 8] += V[(opcode & 0x00F0) >> 4];
+    pc += 2;
+}
+void Chip8::process_8XY5(unsigned short opcode)
+{
+    if (V[(opcode & 0x0F00) >> 8] < V[(opcode & 0x00F0) >> 4])
+    {
+        V[0xF] = 0x00;
+    }
+    else
+    {
+        V[0xF] = 0x01;
+    }
+    V[(opcode & 0x0F00) >> 8] -= V[(opcode & 0x00F0) >> 4];
+    pc += 2;
+}
+void Chip8::process_8XY6(unsigned short opcode)
+{
+    V[0xF] = V[(opcode & 0x0F00) >> 8] & 0x1;
+    V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x00F0) >> 4] >> 1;
+    pc += 2;
+}
+void Chip8::process_8XY7(unsigned short opcode)
+{
+    if (V[(opcode & 0x0F00) >> 8] > V[(opcode & 0x00F0) >> 4])
+    {
+        V[0xF] = 0x00;
+    }
+    else
+    {
+        V[0xF] = 0x01;
+    }
+    V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x00F0) >> 4] - V[(opcode & 0x0F00) >> 8];
+    pc += 2;
+}
+void Chip8::process_8XYE(unsigned short opcode)
+{
+    V[0xF] = V[(opcode & 0x0F00) >> 8] >> 7;
+    V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x00F0) >> 4] << 1;
+    pc += 2;
+}
+void Chip8::process_9XY0(unsigned short opcode)
+{
+    if (V[(opcode & 0x0F00) >> 8] != V[(opcode & 0x00F0) >> 4])
+    {
+        pc += 4;
+    }
+    else
+    {
+        pc += 2;
+    }
+}
+void Chip8::process_ANNN(unsigned short opcode)
+{
+    I = opcode & 0x0FFF;
+    pc += 2;
+}
+void Chip8::process_BNNN(unsigned short opcode)
+{
+    pc = (opcode & 0x0FFF) + V[0x0];
+}
+void Chip8::process_CXNN(unsigned short opcode)
+{
+    V[(opcode & 0x0F00) >> 8] = distribution(engine) & (opcode & 0x00FF);
+    pc += 2;
+}
+void Chip8::process_DXYN(unsigned short opcode)
+{
+    unsigned short x = V[(opcode & 0x0F00) >> 8];
+    unsigned short y = V[(opcode & 0x00F0) >> 4];
+    unsigned short height = opcode & 0x000F;
+    unsigned short line;
+
+    V[0xF] = 0x00;
+    for (int yline = 0; yline < height; ++yline)
+    {
+        line = memory[I + yline];
+        for (int xline = 0; xline < 8; ++xline)
+        {
+            if (line & (0x80 >> xline)) // 0x80 -> 0b1000 0000
+            {
+                if (display[x + xline + (y + yline) * DISPLAY_WIDTH] == 1)
+                {
+                    V[0xF] = 0x01;
+                }
+
+                display[x + xline + (y + yline) * DISPLAY_WIDTH] ^= 1;
+            }
+        }
+    }
+
+    redraw = true;
+    pc += 2;
+}
+void Chip8::process_EX9E(unsigned short opcode)
+{
+    if (keypad[V[(opcode & 0x0F00) >> 8]])
+    {
+        pc += 4;
+    }
+    else
+    {
+        pc += 2;
+    }
+}
+void Chip8::process_EXA1(unsigned short opcode)
+{
+    if (!keypad[V[(opcode & 0x0F00) >> 8]])
+    {
+        pc += 4;
+    }
+    else
+    {
+        pc += 2;
+    }
+}
+void Chip8::process_FX07(unsigned short opcode)
+{
+    V[(opcode & 0x0F00) >> 8] = delayTimer;
+    pc += 2;
+}
+void Chip8::process_FX0A(unsigned short opcode)
+{
+    for (int i = 0; i < 16; ++i)
+    {
+        if (keypad[i])
+        {
+            V[(opcode & 0x0F00) >> 8] = i;
+            pc += 2; // move program counter only if key is pressed
+        }
+    }
+}
+void Chip8::process_FX15(unsigned short opcode)
+{
+    delayTimer = V[(opcode & 0x0F00) >> 8];
+    pc += 2;
+}
+void Chip8::process_FX18(unsigned short opcode)
+{
+    soundTimer = V[(opcode & 0x0F00) >> 8];
+    pc += 2;
+}
+void Chip8::process_FX1E(unsigned short opcode)
+{
+    I += V[(opcode & 0x0F00) >> 8];
+    pc += 2;
+}
+void Chip8::process_FX29(unsigned short opcode)
+{
+    const unsigned short FONT_WIDTH = 5;
+    I = V[(opcode & 0x0F00) >> 8] * FONT_WIDTH;
+    pc += 2;
+}
+void Chip8::process_FX33(unsigned short opcode)
+{
+    memory[I] = V[(opcode & 0x0F00) >> 8] / 100;
+    memory[I + 1] = (V[(opcode & 0x0F00) >> 8] % 100) / 10;
+    memory[I + 2] = (V[(opcode & 0x0F00) >> 8] % 100) % 10;
+    pc += 2;
+}
+void Chip8::process_FX55(unsigned short opcode)
+{
+    for (int i = 0; i <= ((opcode & 0x0F00) >> 8); ++i)
+    {
+        memory[I + i] = V[i];
+    }
+    I += ((opcode & 0x0F00) >> 8) + 1;
+    pc += 2;
+}
+void Chip8::process_FX65(unsigned short opcode)
+{
+    for (int i = 0; i <= ((opcode & 0x0F00) >> 8); ++i)
+    {
+        V[i] = memory[I + i];
+    }
+    I += ((opcode & 0x0F00) >> 8) + 1;
+    pc += 2;
 }

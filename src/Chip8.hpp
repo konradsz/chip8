@@ -25,6 +25,43 @@ private:
     void draw();
     void handleInput();
 
+private: // opcodes
+    void process_00E0(unsigned short opcode);
+    void process_00EE(unsigned short opcode);
+    void process_1NNN(unsigned short opcode);
+    void process_2NNN(unsigned short opcode);
+    void process_3XNN(unsigned short opcode);
+    void process_4XNN(unsigned short opcode);
+    void process_5XY0(unsigned short opcode);
+    void process_6XNN(unsigned short opcode);
+    void process_7XNN(unsigned short opcode);
+    void process_8XY0(unsigned short opcode);
+    void process_8XY1(unsigned short opcode);
+    void process_8XY2(unsigned short opcode);
+    void process_8XY3(unsigned short opcode);
+    void process_8XY4(unsigned short opcode);
+    void process_8XY5(unsigned short opcode);
+    void process_8XY6(unsigned short opcode);
+    void process_8XY7(unsigned short opcode);
+    void process_8XYE(unsigned short opcode);
+    void process_9XY0(unsigned short opcode);
+    void process_ANNN(unsigned short opcode);
+    void process_BNNN(unsigned short opcode);
+    void process_CXNN(unsigned short opcode);
+    void process_DXYN(unsigned short opcode);
+    void process_EX9E(unsigned short opcode);
+    void process_EXA1(unsigned short opcode);
+    void process_FX07(unsigned short opcode);
+    void process_FX0A(unsigned short opcode);
+    void process_FX15(unsigned short opcode);
+    void process_FX18(unsigned short opcode);
+    void process_FX1E(unsigned short opcode);
+    void process_FX29(unsigned short opcode);
+    void process_FX33(unsigned short opcode);
+    void process_FX55(unsigned short opcode);
+    void process_FX65(unsigned short opcode);
+    
+
 private:
     // use uint16 etc
     unsigned char memory[MEMORY_SIZE];

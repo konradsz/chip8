@@ -71,7 +71,7 @@ void Chip8::run()
 
         sf::Time elapsed = clock.getElapsedTime();
         sf::Time time = elapsed + lag;
-
+        
         const int NUMBER_OF_CYCLES_PER_SECOND = 600;
         const float TIMER_FREQUENCY = 60.0f; // 60 Hz
         const int NUMBER_OF_CYCLES_PER_FRAME = NUMBER_OF_CYCLES_PER_SECOND / TIMER_FREQUENCY;
@@ -459,25 +459,12 @@ void Chip8::handleInput()
             case sf::Keyboard::Escape:
                 window.close();
                 break;
-            case sf::Keyboard::Num1:
-            case sf::Keyboard::Num2:
-            case sf::Keyboard::Num3:
-            case sf::Keyboard::Num4:
-            case sf::Keyboard::Q:
-            case sf::Keyboard::W:
-            case sf::Keyboard::E:
-            case sf::Keyboard::R:
-            case sf::Keyboard::A:
-            case sf::Keyboard::S:
-            case sf::Keyboard::D:
-            case sf::Keyboard::F:
-            case sf::Keyboard::Z:
-            case sf::Keyboard::X:
-            case sf::Keyboard::C:
-            case sf::Keyboard::V:
-                keypad[keyCodeMap[event.key.code]] = isPressed(event.type);
-                break;
             default:
+                const auto it = keyCodeMap.find(event.key.code);
+                if (it != keyCodeMap.end())
+                {
+                    keypad[it->second] = isPressed(event.type);
+                }
                 break;
             }
         }

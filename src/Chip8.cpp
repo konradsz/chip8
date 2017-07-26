@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <iostream>
 #include <map>
+#include <array>
+#include <functional>
 
 #include <SFML/Graphics.hpp>
 
@@ -118,145 +120,32 @@ void Chip8::decrementTimers()
 
 void Chip8::processOpcode(unsigned short opcode)
 {
-    // what about getting each hex separately? (NIBBLE - 4 bits)
-    // first = opcode & 0xF000
-    // second = opcode & 0x0F00
-    // third = opcode & 0x00F0
-    // fourth = opcode & 0x000F
-    switch (opcode & 0xF000)
+    //std::function<void(unsigned short)> f = [=](unsigned short opcode) { process_1NNN(opcode); };
+    //using namespace std::placeholders;
+    //std::bind(&Chip8::process_1NNN, this, _1),
+
+    std::array<std::function<void()>, 16> a =
     {
-    case 0x0000:
-        switch (opcode & 0x00FF)
-        {
-        case 0x00E0: // 0x00E0: clear the screen
-            process_00E0(opcode);
-            break;
-        case 0x00EE: // 0x00EE: return from a subroutine
-            process_00EE(opcode);
-            break;
-        }
-        break;
-    case 0x1000: // 0x1NNN: jump to address NNN
-        process_1NNN(opcode);
-        break;
-    case 0x2000: // 0x2NNN: execute subrouting starting at address NNN
-        process_2NNN(opcode);
-        break;
-    case 0x3000: // 0x3XNN: skip the following instruction if VX == NN
-        process_3XNN(opcode);
-        break;
-    case 0x4000: // 0x4XNN: skip the following instruction if VX != NN
-        process_4XNN(opcode);
-        break;
-    case 0x5000: // 0x5XY0: skip the following instruction if VX == VY
-        process_5XY0(opcode);
-        break;
-    case 0x6000: // 0x6XNN: store NN in VX
-        process_6XNN(opcode);
-        break;
-    case 0x7000: // 0x7XNN: add NN to VX
-        process_7XNN(opcode);
-        break;
-    case 0x8000:
-        switch (opcode & 0x000F)
-        {
-        case 0x0000: // 0x8XY0: store VY in VX
-            process_8XY0(opcode);
-            break;
-        case 0x0001: // 0x8XY1: set VX to VX | VY
-            process_8XY1(opcode);
-            break;
-        case 0x0002: // 0x8XY2: set VX to VX & VY
-            process_8XY2(opcode);
-            break;
-        case 0x0003: // 0x8XY3: set VX to VX ^ VY
-            process_8XY3(opcode);
-            break;
-        case 0x0004: // 0x8XY4: add VY to VX; set VF to 01 if a carry occurs, 00 otherwise
-            process_8XY4(opcode);
-            break;
-        case 0x0005: // 0x8XY5: substruct VY from VX; set VF to 00 if a borrow occurs, 01 otherwise
-            process_8XY5(opcode);
-            break;
-        case 0x0006: // 0x8XY6: store VY shifted right one bit in VX;
-                     // set VF to the least significant bit prior to the shift
-            process_8XY6(opcode);
-            break;
-        case 0x0007: // 0x8XY7: set VX to VY - VX; set VF to 00 if a borrow occurs, 01 otherwise
-            process_8XY7(opcode);
-            break;
-        case 0x000E: // 0x8XYE: store VY shifted left one bit in VX;
-                     // set VF to the most significant bit prior to the shift
-            process_8XYE(opcode);
-            break;
-        }
-        break;
-    case 0x9000: // 0x9XY0: skip the following instruction if VX != VY
-        process_9XY0(opcode);
-        break;
-    case 0xA000: // 0xANNN: store NNN in I
-        process_ANNN(opcode);
-        break;
-    case 0xB000: // 0xBNNN: jump to address NNN + V0
-        process_BNNN(opcode);
-        break;
-    case 0xC000: // 0xCXNN: set VX to a random number with a mask NN
-        process_CXNN(opcode);
-        break;
-    case 0xD000: // 0xDXYN: draw a sprite at position (VX, VY) with N bytes of sprite data starting at the address I; 
-                 // set VF to 01 if any set pixels are changed to unset, and 00 otherwise
-        process_DXYN(opcode);
-        break;
-    case 0xE000:
-        switch (opcode & 0x00FF)
-        {
-        case 0x009E: // 0xEX9E: skip the following instruction if the key corresponding
-                     // to the hex value currently stored in VX is pressed
-            process_EX9E(opcode);
-            break;
-        case 0x00A1: // 0xEXA1: skip the following instruction if the key corresponding
-                     // to the hex value currently stored in VX is not pressed
-            process_EXA1(opcode);
-            break;
-        }
-        break;
-    case 0xF000:
-        switch (opcode & 0x00FF)
-        {
-        case 0x0007: // 0xFX07: store the current value of the delay timer in VX
-            process_FX07(opcode);
-            break;
-        case 0x000A: // 0xFX0A: wait for a keypress and store the result in VX
-            process_FX0A(opcode);
-            break;
-        case 0x0015: // 0xFX15: set the delay timer to the value of VX
-            process_FX15(opcode);
-            break;
-        case 0x0018: // 0xFX18: set the sound timer to the value of VX
-            process_FX18(opcode);
-            break;
-        case 0x001E: // 0xFX1E: add the value stored in VX to I
-            process_FX1E(opcode);
-            break;
-        case 0x0029: // 0xFX29: set I to the memory address of the sprite data corresponding
-                     // to the hexadecimal digit stored in VX
-            process_FX29(opcode);
-            break;
-        case 0x0033: // 0xFX33: store the binary-coded decimal equivalent of the value
-                     // stored in VX at addresses I, I + 1, and I + 2
-            process_FX33(opcode);
-            break;
-        case 0x0055: // 0xFX55: store the values of registers V0 to VX inclusive in memory starting at address I;
-                     // I is set to I + X + 1 after operation
-            process_FX55(opcode);
-            break;
-        case 0x0065: // 0xFX65: fill registers V0 to VX inclusive with the values stored in memory starting at address I
-                     // I is set to I + X + 1 after operation
-            process_FX65(opcode);
-            break;
-        }
-        break;
-    }
+        [=]() { process_0000(opcode); },
+        [=]() { process_1NNN(opcode); },
+        [=]() { process_2NNN(opcode); },
+        [=]() { process_3XNN(opcode); },
+        [=]() { process_4XNN(opcode); },
+        [=]() { process_5XY0(opcode); },
+        [=]() { process_6XNN(opcode); },
+        [=]() { process_7XNN(opcode); },
+        [=]() { process_8000(opcode); },
+        [=]() { process_9XY0(opcode); },
+        [=]() { process_ANNN(opcode); },
+        [=]() { process_BNNN(opcode); },
+        [=]() { process_CXNN(opcode); },
+        [=]() { process_DXYN(opcode); },
+        [=]() { process_E000(opcode); },
+        [=]() { process_F000(opcode); }
+    };
+
+    unsigned short first = (opcode & 0xF000) >> 12;
+    a[first]();
 }
 
 void Chip8::draw()
@@ -327,6 +216,106 @@ void Chip8::handleInput()
                 break;
             }
         }
+    }
+}
+
+void Chip8::process_0000(unsigned short opcode)
+{
+    unsigned short fourth = opcode & 0x000F;
+    switch (fourth)
+    {
+    case 0x0: // 0x00E0: clear the screen
+        process_00E0(opcode);
+        break;
+    case 0xE: // 0x00EE: return from a subroutine
+        process_00EE(opcode);
+        break;
+    }
+}
+void Chip8::process_8000(unsigned short opcode)
+{
+    switch (opcode & 0x000F)
+    {
+    case 0x0000: // 0x8XY0: store VY in VX
+        process_8XY0(opcode);
+        break;
+    case 0x0001: // 0x8XY1: set VX to VX | VY
+        process_8XY1(opcode);
+        break;
+    case 0x0002: // 0x8XY2: set VX to VX & VY
+        process_8XY2(opcode);
+        break;
+    case 0x0003: // 0x8XY3: set VX to VX ^ VY
+        process_8XY3(opcode);
+        break;
+    case 0x0004: // 0x8XY4: add VY to VX; set VF to 01 if a carry occurs, 00 otherwise
+        process_8XY4(opcode);
+        break;
+    case 0x0005: // 0x8XY5: substruct VY from VX; set VF to 00 if a borrow occurs, 01 otherwise
+        process_8XY5(opcode);
+        break;
+    case 0x0006: // 0x8XY6: store VY shifted right one bit in VX;
+                 // set VF to the least significant bit prior to the shift
+        process_8XY6(opcode);
+        break;
+    case 0x0007: // 0x8XY7: set VX to VY - VX; set VF to 00 if a borrow occurs, 01 otherwise
+        process_8XY7(opcode);
+        break;
+    case 0x000E: // 0x8XYE: store VY shifted left one bit in VX;
+                 // set VF to the most significant bit prior to the shift
+        process_8XYE(opcode);
+        break;
+    }
+}
+void Chip8::process_E000(unsigned short opcode)
+{
+    switch (opcode & 0x00FF)
+    {
+    case 0x009E: // 0xEX9E: skip the following instruction if the key corresponding
+                 // to the hex value currently stored in VX is pressed
+        process_EX9E(opcode);
+        break;
+    case 0x00A1: // 0xEXA1: skip the following instruction if the key corresponding
+                 // to the hex value currently stored in VX is not pressed
+        process_EXA1(opcode);
+        break;
+    }
+}
+void Chip8::process_F000(unsigned short opcode)
+{
+    switch (opcode & 0x00FF)
+    {
+    case 0x0007: // 0xFX07: store the current value of the delay timer in VX
+        process_FX07(opcode);
+        break;
+    case 0x000A: // 0xFX0A: wait for a keypress and store the result in VX
+        process_FX0A(opcode);
+        break;
+    case 0x0015: // 0xFX15: set the delay timer to the value of VX
+        process_FX15(opcode);
+        break;
+    case 0x0018: // 0xFX18: set the sound timer to the value of VX
+        process_FX18(opcode);
+        break;
+    case 0x001E: // 0xFX1E: add the value stored in VX to I
+        process_FX1E(opcode);
+        break;
+    case 0x0029: // 0xFX29: set I to the memory address of the sprite data corresponding
+                 // to the hexadecimal digit stored in VX
+        process_FX29(opcode);
+        break;
+    case 0x0033: // 0xFX33: store the binary-coded decimal equivalent of the value
+                 // stored in VX at addresses I, I + 1, and I + 2
+        process_FX33(opcode);
+        break;
+    case 0x0055: // 0xFX55: store the values of registers V0 to VX inclusive in memory starting at address I;
+                 // I is set to I + X + 1 after operation
+        process_FX55(opcode);
+        break;
+    case 0x0065: // 0xFX65: fill registers V0 to VX inclusive with the values stored in memory starting at address I
+                 // I is set to I + X + 1 after operation
+        process_FX65(opcode);
+        break;
     }
 }
 

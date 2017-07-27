@@ -57,9 +57,9 @@ void Chip8::run()
         sf::Time elapsed = clock.getElapsedTime();
         sf::Time time = elapsed + lag;
         
-        const unsigned CYCLES_PER_SECOND = 600; // 600 Hz
-        const unsigned TIMER_FREQUENCY = 60; // 60 Hz
-        const unsigned CYCLES_PER_FRAME = CYCLES_PER_SECOND / TIMER_FREQUENCY;
+        const unsigned int CYCLES_PER_SECOND = 600; // 600 Hz
+        const unsigned int TIMER_FREQUENCY = 60; // 60 Hz
+        const unsigned int CYCLES_PER_FRAME = CYCLES_PER_SECOND / TIMER_FREQUENCY;
         const sf::Time tickInterval = sf::microseconds(static_cast<sf::Int64>(1000000.0f / TIMER_FREQUENCY));
 
         if (time > tickInterval)
@@ -90,9 +90,9 @@ void Chip8::draw()
     {
         window.clear();
 
-        for (int i = 0; i < DISPLAY_WIDTH; ++i)
+        for (unsigned int i = 0; i < DISPLAY_WIDTH; ++i)
         {
-            for (int j = 0; j < DISPLAY_HEIGHT; ++j)
+            for (unsigned int j = 0; j < DISPLAY_HEIGHT; ++j)
             {
                 if (cpu.display[i + j * DISPLAY_WIDTH] != 0)
                 {
@@ -110,7 +110,7 @@ void Chip8::draw()
 
 void Chip8::handleInput()
 {
-    static const std::map<sf::Keyboard::Key, int> keyCodeMap =
+    static const std::map<sf::Keyboard::Key, uint8_t> keyCodeMap =
     {
         { sf::Keyboard::X,    0x0 },
         { sf::Keyboard::Num1, 0x1 },

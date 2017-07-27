@@ -13,6 +13,9 @@ public:
     void emulateCycle();
     void decrementTimers();
 
+    bool redraw();
+    bool playSound() const;
+
 private:
     void processOpcode(unsigned short opcode);
 
@@ -69,9 +72,6 @@ public:
     unsigned char memory[MEMORY_SIZE];
     unsigned char display[DISPLAY_WIDTH * DISPLAY_HEIGHT];
     unsigned char keypad[16];
-    unsigned char delayTimer;
-    unsigned char soundTimer;
-    bool redraw;
 
 private:
     unsigned char V[16];
@@ -79,6 +79,10 @@ private:
     unsigned short pc;
     unsigned short stack[16];
     unsigned char sp;
+
+    unsigned char delayTimer;
+    unsigned char soundTimer;
+    bool drawFlag;
 
     std::mt19937 engine;
     std::uniform_int_distribution<> distribution;

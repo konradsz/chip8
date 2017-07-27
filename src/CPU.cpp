@@ -20,7 +20,7 @@ CPU::CPU() :
 
     delayTimer = 0;
     soundTimer = 0;
-    redraw = false;
+    drawFlag = false;
 }
 
 void CPU::emulateCycle()
@@ -44,9 +44,21 @@ void CPU::decrementTimers()
     }
 }
 
+bool CPU::redraw()
+{
+    bool old = drawFlag;
+    drawFlag = false;
+    return old;
+}
+
+bool CPU::playSound() const
+{
+    return (soundTimer == 1);
+}
+
 void CPU::processOpcode(unsigned short opcode)
 {
-    static std::array<std::function<void()>, 16> opcodeFunctions =
+    static const std::array<std::function<void()>, 16> opcodeFunctions =
     {
         [&]() { process_00EN(opcode); },
         [&]() { process_1NNN(opcode); },
@@ -67,24 +79,24 @@ void CPU::processOpcode(unsigned short opcode)
     };
 
     unsigned short nibble = (opcode & 0xF000) >> 12;
-    opcodeFunctions[nibble]();
+    opcodeFunctions.at(nibble)();
 }
 
 void CPU::process_00EN(unsigned short opcode)
 {
     unsigned short nibble = opcode & 0x000F;
-    static std::map<unsigned short, std::function<void()>> opcodeFunctions =
+    static const std::map<unsigned short, std::function<void()>> opcodeFunctions =
     {
         { 0x0, [&]() { process_00E0(opcode); } },
         { 0xE, [&]() { process_00EE(opcode); } }
     };
-    opcodeFunctions[nibble]();
+    opcodeFunctions.at(nibble)();
 }
 
 void CPU::process_8XYN(unsigned short opcode)
 {
     unsigned short nibble = opcode & 0x000F;
-    static std::map<unsigned short, std::function<void()>> opcodeFunctions =
+    static const std::map<unsigned short, std::function<void()>> opcodeFunctions =
     {
         { 0x0, [&]() { process_8XY0(opcode); } },
         { 0x1, [&]() { process_8XY1(opcode); } },
@@ -96,24 +108,24 @@ void CPU::process_8XYN(unsigned short opcode)
         { 0x7, [&]() { process_8XY7(opcode); } },
         { 0xE, [&]() { process_8XYE(opcode); } }
     };
-    opcodeFunctions[nibble]();
+    opcodeFunctions.at(nibble)();
 }
 
 void CPU::process_EXNN(unsigned short opcode)
 {
     unsigned short byte = opcode & 0x00FF;
-    static std::map<unsigned short, std::function<void()>> opcodeFunctions =
+    static const std::map<unsigned short, std::function<void()>> opcodeFunctions =
     {
         { 0x9E, [&]() { process_EX9E(opcode); } },
         { 0xA1, [&]() { process_EXA1(opcode); } }
     };
-    opcodeFunctions[byte]();
+    opcodeFunctions.at(byte)();
 }
 
 void CPU::process_FXNN(unsigned short opcode)
 {
     unsigned short byte = opcode & 0x00FF;
-    static std::map<unsigned short, std::function<void()>> opcodeFunctions =
+    static const std::map<unsigned short, std::function<void()>> opcodeFunctions =
     {
         { 0x07, [&]() { process_FX07(opcode); } },
         { 0x0A, [&]() { process_FX0A(opcode); } },
@@ -125,13 +137,13 @@ void CPU::process_FXNN(unsigned short opcode)
         { 0x55, [&]() { process_FX55(opcode); } },
         { 0x65, [&]() { process_FX65(opcode); } }
     };
-    opcodeFunctions[byte]();
+    opcodeFunctions.at(byte)();
 }
 
 void CPU::process_00E0(unsigned short opcode)
 {
     std::fill(std::begin(display), std::end(display), 0);
-    redraw = true;
+    drawFlag = true;
     pc += 2;
 }
 
@@ -336,7 +348,7 @@ void CPU::process_DXYN(unsigned short opcode)
         }
     }
 
-    redraw = true;
+    drawFlag = true;
     pc += 2;
 }
 

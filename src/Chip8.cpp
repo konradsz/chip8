@@ -11,7 +11,9 @@
 const float TILE_SIZE = 10.0f;
 
 Chip8::Chip8() :
-    window{ sf::VideoMode(DISPLAY_WIDTH * TILE_SIZE, DISPLAY_HEIGHT * TILE_SIZE), "Chip8" }
+    window{ sf::VideoMode(DISPLAY_WIDTH * static_cast<unsigned>(TILE_SIZE),
+                          DISPLAY_HEIGHT * static_cast<unsigned>(TILE_SIZE)),
+                          "Chip8" }
 {
 }
 
@@ -55,20 +57,22 @@ void Chip8::run()
         sf::Time elapsed = clock.getElapsedTime();
         sf::Time time = elapsed + lag;
         
-        const int NUMBER_OF_CYCLES_PER_SECOND = 600;
-        const float TIMER_FREQUENCY = 60.0f; // 60 Hz
-        const int NUMBER_OF_CYCLES_PER_FRAME = NUMBER_OF_CYCLES_PER_SECOND / TIMER_FREQUENCY;
+        const unsigned CYCLES_PER_SECOND = 600; // 600 Hz
+        const unsigned TIMER_FREQUENCY = 60; // 60 Hz
+        const unsigned CYCLES_PER_FRAME = CYCLES_PER_SECOND / TIMER_FREQUENCY;
         const sf::Time tickInterval = sf::microseconds(static_cast<sf::Int64>(1000000.0f / TIMER_FREQUENCY));
 
         if (time > tickInterval)
         {
-            for (unsigned int i = 0; i < NUMBER_OF_CYCLES_PER_FRAME; ++i)
+            for (unsigned int i = 0; i < CYCLES_PER_FRAME; ++i)
             {
                 cpu.emulateCycle();
             }
             
-            if (cpu.soundTimer == 1)
+            if (cpu.playSound())
+            {
                 std::cout << "BEEP" << std::endl; // playSound!
+            }
 
             cpu.decrementTimers();
 
@@ -82,9 +86,8 @@ void Chip8::run()
 
 void Chip8::draw()
 {
-    if (cpu.redraw)
+    if (cpu.redraw())
     {
-        cpu.redraw = false;
         window.clear();
 
         for (int i = 0; i < DISPLAY_WIDTH; ++i)
@@ -107,7 +110,7 @@ void Chip8::draw()
 
 void Chip8::handleInput()
 {
-    static std::map<sf::Keyboard::Key, int> keyCodeMap =
+    static const std::map<sf::Keyboard::Key, int> keyCodeMap =
     {
         { sf::Keyboard::X,    0x0 },
         { sf::Keyboard::Num1, 0x1 },

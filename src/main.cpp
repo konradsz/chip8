@@ -1,15 +1,21 @@
+#include <iostream>
+
 #include "Chip8.hpp"
 
-int main()
+int main(int argc, char* argv[])
 {
     Chip8 chip;
 
-    //chip.loadProgram("mathMaze.ch8");
-    //chip.loadProgram("invaders.c8");
-    //chip.loadProgram("tetris.c8");
-    chip.loadROM("../roms/BLINKY");
+    if (argc != 2)
+    {
+        std::cerr << "Usage: ./" << argv[0] << " pathToROM" << std::endl;
+        return 0;
+    }
 
-    chip.run();
+    if (chip.loadROM(argv[1]))
+    {
+        chip.run();
+    }
 
     return 0;
 }

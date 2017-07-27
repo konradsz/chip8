@@ -17,7 +17,7 @@ Chip8::Chip8() :
 {
 }
 
-void Chip8::loadROM(const std::string& fileName)
+bool Chip8::loadROM(const std::string& fileName)
 {
     std::ifstream program(fileName.c_str(), std::ios::binary);
     if (program.is_open())
@@ -31,17 +31,19 @@ void Chip8::loadROM(const std::string& fileName)
             std::copy(std::begin(buffer), std::end(buffer),
                 std::begin(cpu.memory) + PROGRAM_MEMORY_OFFSET);
 
-            std::cout << "ROM " << fileName << " loaded, size: " << buffer.size() << std::endl;
+            std::cout << "ROM '" << fileName << "' loaded, size: " << buffer.size() << std::endl;
         }
         else
         {
             std::cerr << "ROM image is too big: " << buffer.size() << " (max "
                 << MEMORY_SIZE - PROGRAM_MEMORY_OFFSET << ")" << std::endl;
         }
+        return true;
     }
     else
     {
-        std::cerr << "Unable to open file: " << fileName << std::endl;
+        std::cerr << "Unable to open ROM: " << fileName << std::endl;
+        return false;
     }
 }
 

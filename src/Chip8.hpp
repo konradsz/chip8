@@ -9,7 +9,7 @@ class Chip8
 {
 public:
     Chip8();
-    void loadROM(const std::string& fileName);
+    bool loadROM(const std::string& fileName);
     void run();
 
 private:

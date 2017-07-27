@@ -1,0 +1,435 @@
+#include "CPU.hpp"
+
+#include <array>
+#include <map>
+#include <functional>
+
+CPU::CPU() :
+    engine{ std::random_device()() },
+    distribution{ 0, 0xFF }
+{
+    pc = PROGRAM_MEMORY_OFFSET;
+    sp = 0;
+    I = 0;
+
+    std::fill(std::begin(memory), std::end(memory), 0);
+    std::fill(std::begin(V), std::end(V), 0);
+    std::fill(std::begin(stack), std::end(stack), 0);
+    std::fill(std::begin(display), std::end(display), 0);
+    std::fill(std::begin(keypad), std::end(keypad), 0);
+
+    delayTimer = 0;
+    soundTimer = 0;
+    redraw = false;
+}
+
+void CPU::emulateCycle()
+{
+    // fetch opcode
+    unsigned short opcode = memory[pc] << 8 | memory[pc + 1];
+    // process opcode
+    processOpcode(opcode);
+}
+
+void CPU::decrementTimers()
+{
+    if (delayTimer > 0)
+    {
+        --delayTimer;
+    }
+
+    if (soundTimer > 0)
+    {
+        --soundTimer;
+    }
+}
+
+void CPU::processOpcode(unsigned short opcode)
+{
+    static std::array<std::function<void()>, 16> opcodeFunctions =
+    {
+        [&]() { process_00EN(opcode); },
+        [&]() { process_1NNN(opcode); },
+        [&]() { process_2NNN(opcode); },
+        [&]() { process_3XNN(opcode); },
+        [&]() { process_4XNN(opcode); },
+        [&]() { process_5XY0(opcode); },
+        [&]() { process_6XNN(opcode); },
+        [&]() { process_7XNN(opcode); },
+        [&]() { process_8XYN(opcode); },
+        [&]() { process_9XY0(opcode); },
+        [&]() { process_ANNN(opcode); },
+        [&]() { process_BNNN(opcode); },
+        [&]() { process_CXNN(opcode); },
+        [&]() { process_DXYN(opcode); },
+        [&]() { process_EXNN(opcode); },
+        [&]() { process_FXNN(opcode); }
+    };
+
+    unsigned short nibble = (opcode & 0xF000) >> 12;
+    opcodeFunctions[nibble]();
+}
+
+void CPU::process_00EN(unsigned short opcode)
+{
+    unsigned short nibble = opcode & 0x000F;
+    static std::map<unsigned short, std::function<void()>> opcodeFunctions =
+    {
+        { 0x0, [&]() { process_00E0(opcode); } },
+        { 0xE, [&]() { process_00EE(opcode); } }
+    };
+    opcodeFunctions[nibble]();
+}
+
+void CPU::process_8XYN(unsigned short opcode)
+{
+    unsigned short nibble = opcode & 0x000F;
+    static std::map<unsigned short, std::function<void()>> opcodeFunctions =
+    {
+        { 0x0, [&]() { process_8XY0(opcode); } },
+        { 0x1, [&]() { process_8XY1(opcode); } },
+        { 0x2, [&]() { process_8XY2(opcode); } },
+        { 0x3, [&]() { process_8XY3(opcode); } },
+        { 0x4, [&]() { process_8XY4(opcode); } },
+        { 0x5, [&]() { process_8XY5(opcode); } },
+        { 0x6, [&]() { process_8XY6(opcode); } },
+        { 0x7, [&]() { process_8XY7(opcode); } },
+        { 0xE, [&]() { process_8XYE(opcode); } }
+    };
+    opcodeFunctions[nibble]();
+}
+
+void CPU::process_EXNN(unsigned short opcode)
+{
+    unsigned short byte = opcode & 0x00FF;
+    static std::map<unsigned short, std::function<void()>> opcodeFunctions =
+    {
+        { 0x9E, [&]() { process_EX9E(opcode); } },
+        { 0xA1, [&]() { process_EXA1(opcode); } }
+    };
+    opcodeFunctions[byte]();
+}
+
+void CPU::process_FXNN(unsigned short opcode)
+{
+    unsigned short byte = opcode & 0x00FF;
+    static std::map<unsigned short, std::function<void()>> opcodeFunctions =
+    {
+        { 0x07, [&]() { process_FX07(opcode); } },
+        { 0x0A, [&]() { process_FX0A(opcode); } },
+        { 0x15, [&]() { process_FX15(opcode); } },
+        { 0x18, [&]() { process_FX18(opcode); } },
+        { 0x1E, [&]() { process_FX1E(opcode); } },
+        { 0x29, [&]() { process_FX29(opcode); } },
+        { 0x33, [&]() { process_FX33(opcode); } },
+        { 0x55, [&]() { process_FX55(opcode); } },
+        { 0x65, [&]() { process_FX65(opcode); } }
+    };
+    opcodeFunctions[byte]();
+}
+
+void CPU::process_00E0(unsigned short opcode)
+{
+    std::fill(std::begin(display), std::end(display), 0);
+    redraw = true;
+    pc += 2;
+}
+
+void CPU::process_00EE(unsigned short opcode)
+{
+    --sp;
+    pc = stack[sp];
+    pc += 2;
+}
+
+void CPU::process_1NNN(unsigned short opcode)
+{
+    pc = opcode & 0x0FFF;
+}
+
+void CPU::process_2NNN(unsigned short opcode)
+{
+    stack[sp] = pc;
+    ++sp;
+    pc = opcode & 0x0FFF;
+}
+
+void CPU::process_3XNN(unsigned short opcode)
+{
+    if (V[(opcode & 0x0F00) >> 8] == (opcode & 0x00FF))
+    {
+        pc += 4;
+    }
+    else
+    {
+        pc += 2;
+    }
+}
+
+void CPU::process_4XNN(unsigned short opcode)
+{
+    if (V[(opcode & 0x0F00) >> 8] != (opcode & 0x00FF))
+    {
+        pc += 4;
+    }
+    else
+    {
+        pc += 2;
+    }
+}
+
+void CPU::process_5XY0(unsigned short opcode)
+{
+    if (V[(opcode & 0x0F00) >> 8] == V[(opcode & 0x00F0) >> 4])
+    {
+        pc += 4;
+    }
+    else
+    {
+        pc += 2;
+    }
+}
+
+void CPU::process_6XNN(unsigned short opcode)
+{
+    V[(opcode & 0x0F00) >> 8] = opcode & 0x00FF;
+    pc += 2;
+}
+
+void CPU::process_7XNN(unsigned short opcode)
+{
+    V[(opcode & 0x0F00) >> 8] += opcode & 0x00FF;
+    pc += 2;
+}
+
+void CPU::process_8XY0(unsigned short opcode)
+{
+    V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x00F0) >> 4];
+    pc += 2;
+}
+
+void CPU::process_8XY1(unsigned short opcode)
+{
+    V[(opcode & 0x0F00) >> 8] |= V[(opcode & 0x00F0) >> 4];
+    pc += 2;
+}
+
+void CPU::process_8XY2(unsigned short opcode)
+{
+    V[(opcode & 0x0F00) >> 8] &= V[(opcode & 0x00F0) >> 4];
+    pc += 2;
+}
+
+void CPU::process_8XY3(unsigned short opcode)
+{
+    V[(opcode & 0x0F00) >> 8] ^= V[(opcode & 0x00F0) >> 4];
+    pc += 2;
+}
+
+void CPU::process_8XY4(unsigned short opcode)
+{
+    if (V[(opcode & 0x0F00) >> 8] > 0xFF - V[(opcode & 0x00F0) >> 4])
+    {
+        V[0xF] = 0x01;
+    }
+    else
+    {
+        V[0xF] = 0x00;
+    }
+    V[(opcode & 0x0F00) >> 8] += V[(opcode & 0x00F0) >> 4];
+    pc += 2;
+}
+
+void CPU::process_8XY5(unsigned short opcode)
+{
+    if (V[(opcode & 0x0F00) >> 8] < V[(opcode & 0x00F0) >> 4])
+    {
+        V[0xF] = 0x00;
+    }
+    else
+    {
+        V[0xF] = 0x01;
+    }
+    V[(opcode & 0x0F00) >> 8] -= V[(opcode & 0x00F0) >> 4];
+    pc += 2;
+}
+
+void CPU::process_8XY6(unsigned short opcode)
+{
+    V[0xF] = V[(opcode & 0x0F00) >> 8] & 0x1;
+    V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x00F0) >> 4] >> 1;
+    pc += 2;
+}
+
+void CPU::process_8XY7(unsigned short opcode)
+{
+    if (V[(opcode & 0x0F00) >> 8] > V[(opcode & 0x00F0) >> 4])
+    {
+        V[0xF] = 0x00;
+    }
+    else
+    {
+        V[0xF] = 0x01;
+    }
+    V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x00F0) >> 4] - V[(opcode & 0x0F00) >> 8];
+    pc += 2;
+}
+
+void CPU::process_8XYE(unsigned short opcode)
+{
+    V[0xF] = V[(opcode & 0x0F00) >> 8] >> 7;
+    V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x00F0) >> 4] << 1;
+    pc += 2;
+}
+
+void CPU::process_9XY0(unsigned short opcode)
+{
+    if (V[(opcode & 0x0F00) >> 8] != V[(opcode & 0x00F0) >> 4])
+    {
+        pc += 4;
+    }
+    else
+    {
+        pc += 2;
+    }
+}
+
+void CPU::process_ANNN(unsigned short opcode)
+{
+    I = opcode & 0x0FFF;
+    pc += 2;
+}
+
+void CPU::process_BNNN(unsigned short opcode)
+{
+    pc = (opcode & 0x0FFF) + V[0x0];
+}
+
+void CPU::process_CXNN(unsigned short opcode)
+{
+    V[(opcode & 0x0F00) >> 8] = distribution(engine) & (opcode & 0x00FF);
+    pc += 2;
+}
+
+void CPU::process_DXYN(unsigned short opcode)
+{
+    unsigned short x = V[(opcode & 0x0F00) >> 8];
+    unsigned short y = V[(opcode & 0x00F0) >> 4];
+    unsigned short height = opcode & 0x000F;
+    unsigned short line;
+
+    V[0xF] = 0x00;
+    for (int yline = 0; yline < height; ++yline)
+    {
+        line = memory[I + yline];
+        for (int xline = 0; xline < 8; ++xline)
+        {
+            if (line & (0x80 >> xline)) // 0x80 -> 0b1000 0000
+            {
+                if (display[x + xline + (y + yline) * DISPLAY_WIDTH] == 1)
+                {
+                    V[0xF] = 0x01;
+                }
+
+                display[x + xline + (y + yline) * DISPLAY_WIDTH] ^= 1;
+            }
+        }
+    }
+
+    redraw = true;
+    pc += 2;
+}
+
+void CPU::process_EX9E(unsigned short opcode)
+{
+    if (keypad[V[(opcode & 0x0F00) >> 8]])
+    {
+        pc += 4;
+    }
+    else
+    {
+        pc += 2;
+    }
+}
+
+void CPU::process_EXA1(unsigned short opcode)
+{
+    if (!keypad[V[(opcode & 0x0F00) >> 8]])
+    {
+        pc += 4;
+    }
+    else
+    {
+        pc += 2;
+    }
+}
+void CPU::process_FX07(unsigned short opcode)
+{
+    V[(opcode & 0x0F00) >> 8] = delayTimer;
+    pc += 2;
+}
+
+void CPU::process_FX0A(unsigned short opcode)
+{
+    for (int i = 0; i < 16; ++i)
+    {
+        if (keypad[i])
+        {
+            V[(opcode & 0x0F00) >> 8] = i;
+            pc += 2; // move program counter only if key is pressed
+        }
+    }
+}
+
+void CPU::process_FX15(unsigned short opcode)
+{
+    delayTimer = V[(opcode & 0x0F00) >> 8];
+    pc += 2;
+}
+
+void CPU::process_FX18(unsigned short opcode)
+{
+    soundTimer = V[(opcode & 0x0F00) >> 8];
+    pc += 2;
+}
+
+void CPU::process_FX1E(unsigned short opcode)
+{
+    I += V[(opcode & 0x0F00) >> 8];
+    pc += 2;
+}
+
+void CPU::process_FX29(unsigned short opcode)
+{
+    const unsigned short FONT_WIDTH = 5;
+    I = V[(opcode & 0x0F00) >> 8] * FONT_WIDTH;
+    pc += 2;
+}
+
+void CPU::process_FX33(unsigned short opcode)
+{
+    memory[I] = V[(opcode & 0x0F00) >> 8] / 100;
+    memory[I + 1] = (V[(opcode & 0x0F00) >> 8] % 100) / 10;
+    memory[I + 2] = (V[(opcode & 0x0F00) >> 8] % 100) % 10;
+    pc += 2;
+}
+
+void CPU::process_FX55(unsigned short opcode)
+{
+    for (int i = 0; i <= ((opcode & 0x0F00) >> 8); ++i)
+    {
+        memory[I + i] = V[i];
+    }
+    I += ((opcode & 0x0F00) >> 8) + 1;
+    pc += 2;
+}
+
+void CPU::process_FX65(unsigned short opcode)
+{
+    for (int i = 0; i <= ((opcode & 0x0F00) >> 8); ++i)
+    {
+        V[i] = memory[I + i];
+    }
+    I += ((opcode & 0x0F00) >> 8) + 1;
+    pc += 2;
+}

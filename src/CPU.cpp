@@ -266,7 +266,7 @@ void CPU::process_8XY3(uint16_t opcode)
 
 void CPU::process_8XY4(uint16_t opcode)
 {
-    if (V[(opcode & 0x0F00) >> 8] > 0xFF - V[(opcode & 0x00F0) >> 4])
+    if (V[(opcode & 0x0F00) >> 4] > (0xFF - V[(opcode & 0x00F0) >> 8]))
     {
         V[0xF] = 0x01;
     }
@@ -295,7 +295,7 @@ void CPU::process_8XY5(uint16_t opcode)
 void CPU::process_8XY6(uint16_t opcode)
 {
     V[0xF] = V[(opcode & 0x0F00) >> 8] & 0x1;
-    V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x00F0) >> 4] >> 1;
+    V[(opcode & 0x0F00) >> 8] >>= 1;
     pc += 2;
 }
 
@@ -316,7 +316,7 @@ void CPU::process_8XY7(uint16_t opcode)
 void CPU::process_8XYE(uint16_t opcode)
 {
     V[0xF] = V[(opcode & 0x0F00) >> 8] >> 7;
-    V[(opcode & 0x0F00) >> 8] = V[(opcode & 0x00F0) >> 4] << 1;
+    V[(opcode & 0x0F00) >> 8] <<= 1;
     pc += 2;
 }
 

@@ -7,7 +7,7 @@ int main()
     //chip.loadProgram("mathMaze.ch8");
     //chip.loadProgram("invaders.c8");
     //chip.loadProgram("tetris.c8");
-    chip.loadROM("../roms/BOWLING");
+    chip.loadROM("../roms/BLINKY");
 
     chip.run();
 

@@ -135,7 +135,11 @@ void Chip8::handleInput()
     sf::Event event;
     while (window.pollEvent(event))
     {
-        if (event.type == sf::Event::KeyPressed || event.type == sf::Event::KeyReleased)
+        if (event.type == sf::Event::Closed)
+        {
+            window.close();
+        }
+        else if (event.type == sf::Event::KeyPressed || event.type == sf::Event::KeyReleased)
         {
             switch (event.key.code)
             {

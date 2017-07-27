@@ -27,11 +27,14 @@ void Chip8::loadProgram(const std::string& fileName)
     {
         std::vector<char> buffer{
             std::istreambuf_iterator<char>(program),
-            std::istreambuf_iterator<char>() };
+            std::istreambuf_iterator<char>()
+        };
         if (buffer.size() <= MEMORY_SIZE - PROGRAM_MEMORY_OFFSET)
         {
             std::copy(std::begin(buffer), std::end(buffer),
                 std::begin(memory) + PROGRAM_MEMORY_OFFSET);
+
+            std::cout << "ROM loaded, size: " << buffer.size() << std::endl;
         }
         else
         {
@@ -124,7 +127,7 @@ void Chip8::processOpcode(unsigned short opcode)
     //using namespace std::placeholders;
     //std::bind(&Chip8::process_1NNN, this, _1),
 
-    std::array<std::function<void()>, 16> a =
+    std::array<std::function<void()>, 16> opcodeFunctions =
     {
         [=]() { process_0000(opcode); },
         [=]() { process_1NNN(opcode); },
@@ -144,8 +147,8 @@ void Chip8::processOpcode(unsigned short opcode)
         [=]() { process_F000(opcode); }
     };
 
-    unsigned short first = (opcode & 0xF000) >> 12;
-    a[first]();
+    unsigned short nibble = (opcode & 0xF000) >> 12;
+    opcodeFunctions[nibble]();
 }
 
 void Chip8::draw()

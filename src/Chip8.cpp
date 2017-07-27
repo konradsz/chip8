@@ -17,7 +17,7 @@ Chip8::Chip8() :
 {
 }
 
-void Chip8::loadProgram(const std::string& fileName)
+void Chip8::loadROM(const std::string& fileName)
 {
     std::ifstream program(fileName.c_str(), std::ios::binary);
     if (program.is_open())
